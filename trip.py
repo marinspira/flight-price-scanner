@@ -4,6 +4,7 @@ from selenium.webdriver.edge.service import Service as EdgeService
 from webdriver_manager.microsoft import EdgeChromiumDriverManager
 from selenium.webdriver.edge.options import Options as EdgeOptions
 import time
+from datetime import datetime
 
 trips = {
     "Barcelona to Floripa": "https://www.google.com/travel/flights?tfs=CBwQARohagwIAxIIL20vMDFmNjJyEQgDEg0vZy8xMWJjNnhscHBkQAFIAXABggELCP___________wGYAQI&tfu=KgIIAw",
@@ -16,7 +17,7 @@ trips = {
 
 def extrair_voos(destination, url):
     options = EdgeOptions()
-    # options.add_argument("--headless")
+    options.add_argument("--headless")
     options.add_argument("--disable-gpu")
     driver = webdriver.Edge(service=EdgeService(EdgeChromiumDriverManager().install()), options=options)
 
@@ -30,11 +31,12 @@ def extrair_voos(destination, url):
     dateInput = driver.find_element(By.CSS_SELECTOR, '[aria-describedby="i34"]')
     dateInput.click()
 
-    time.sleep(5)
+    time.sleep(10)
 
     # Extract dates and its respectives prices
     date_cells = driver.find_elements(By.XPATH, '//div[@role="gridcell" and @jsname="mG3Az"]')
 
+    prices_data = []
     count = 0
     for cell in date_cells:
         if count >= 60:
@@ -47,9 +49,31 @@ def extrair_voos(destination, url):
         except:
             price = "Price unavailable"
 
-        print(f"Date: {date}, Price: {price}")
+        # print(f"Date: {date}, Price: {price}")
+
+        if price is not None:
+            prices_data.append((date, price))
         count += 1
     driver.quit()
-
+    return prices_data
+    
+all_data = {}
 for destination, url in trips.items():
-    extrair_voos(destination, url)
+    prices = extrair_voos(destination, url)
+    all_data[destination] = prices
+
+cheapest_days = {}
+for destination, prices in all_data.items():
+    valid_prices = [
+        (date, price) 
+        for date, price in prices 
+        if price and "unavailable" not in price.lower()
+    ]
+    
+    sorted_prices = sorted(valid_prices, key=lambda x: x[1])
+    cheapest_days[destination] = sorted_prices[:5]
+
+for destination, cheapest_list in cheapest_days.items():
+    print(f"\nTop 5 cheapest dates for {destination}:")
+    for date, price in cheapest_list:
+        print(f"  - {date}: R$ {price}")
